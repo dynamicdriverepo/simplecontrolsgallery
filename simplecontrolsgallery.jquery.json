@@ -3,7 +3,7 @@
   "title": "Simple Controls Gallery",
   "description": " Simple Controls Gallery rotates and displays an image by fading it into view over the previous one, with navigation controls that pop up when the mouse rolls over the Gallery.",
   "keywords": ["gallery", "slideshow", "image"],
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": {
     "name": "Dynamic Drive",
     "email" : "ddrivehelp@gmail.com",
@@ -16,7 +16,7 @@
     }
   ],
   "dependencies": {
-    "jquery": ">=1.4"
+    "jquery": ">=1.6"
   },
   "homepage": "http://www.dynamicdrive.com/dynamicindex4/simplegallery.htm",
   "docs": "http://www.dynamicdrive.com/dynamicindex4/simplegallery.htm",
