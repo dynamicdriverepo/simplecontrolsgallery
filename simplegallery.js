@@ -6,10 +6,13 @@
 	//3) Inside oninit() and onslide(), keyword "this" now references the current gallery instance
 
 //** May 16th, 11'- Updated to v 1.4: Adds ability to show image gallery only after all images within gallery has been loaded. Requires jQuery 1.5+
+//** Oct 6th, 15- Updated to v 1.5:
+	//1) Gallery made responsive and mobile friendly, by supporting a percentage "width" value and swipe/ touch support. Requires Touch Swipe Library 
+	//2) Adds a new "scaleimage" option to scale the images inside the gallery in 2 different ways.
 
 var simpleGallery_navpanel={
 	loadinggif: 'ajaxload.gif', //full path or URL to loading gif image
-	panel: {height:'45px', opacity:0.5, paddingTop:'5px', fontStyle:'bold 11px Verdana'}, //customize nav panel container
+	panel: {height:'50px', opacity:0.5, paddingTop:'5px', fontStyle:'bold 11px Verdana'}, //customize nav panel container
 	images: [ 'left.gif', 'play.gif', 'right.gif', 'pause.gif'], //nav panel images (in that order)
 	imageSpacing: {offsetTop:[-4, 0, -4], spacing:10}, //top offset of left, play, and right images, PLUS spacing between the 3 images
 	slideduration: 500 //duration of slide up animation to reveal panel
@@ -21,9 +24,12 @@ function simpleGallery(settingarg){
 	var setting=this.setting
 	setting.panelheight=(parseInt(setting.navpanelheight)>5)? parseInt(setting.navpanelheight) : parseInt(simpleGallery_navpanel.panel.height)
 	setting.fadeduration=parseInt(setting.fadeduration)
+	setting.scaleimage= setting.scaleimage || 'both'
 	setting.curimage=(setting.persist)? simpleGallery.routines.getCookie("gallery-"+setting.wrapperid) : 0
 	setting.curimage=setting.curimage || 0 //account for curimage being null if cookie is empty
 	setting.preloadfirst=(!jQuery.Deferred)? false : (typeof setting.preloadfirst!="undefined")? setting.preloadfirst : true //Boolean on whether to preload all images before showing gallery
+	setting.resizetimer = null
+	setting.$descpanel = $() // create blank $descpanel object in case $decpanel isn't defined
 	setting.ispaused=!setting.autoplay[0] //ispaused reflects current state of gallery, autoplay[0] indicates whether gallery is set to auto play
 	setting.currentstep=0 //keep track of # of slides slideshow has gone through
 	setting.totalsteps=setting.imagearray.length*setting.autoplay[2] //Total steps limit: # of images x # of user specified cycles
@@ -78,8 +84,51 @@ function simpleGallery(settingarg){
 			setting.$loadinggif.remove()
 			setting.$wrapperdiv.bind('mouseenter', function(){slideshow.showhidenavpanel('show')})
 			setting.$wrapperdiv.bind('mouseleave', function(){slideshow.showhidenavpanel('hide')})
+			if (setting.$wrapperdiv.swipe){ // if swipe library present
+				var navpanelstate = 'hide'
+				setting.$wrapperdiv.swipe({
+					triggerOnTouchEnd : true,
+					triggerOnTouchLeave : true,
+					fallbackToMouseEvents : false, // enable mouse emulation of swipe navigation in non touch devices?
+					swipethreshold: 75,
+					excludedElements:[],
+					swipeStatus:function(event, phase, direction, distance){
+						if (phase == 'cancel'){
+							navpanelstate = (navpanelstate == 'hide')? 'show' : 'hide'
+							slideshow.showhidenavpanel(navpanelstate)
+						}
+						if (phase == 'end'){
+							var navkeyword = /(right)/i.test(direction)? 'prev' : 'next'
+							slideshow.navigate(navkeyword)
+						}
+						event.preventDefault()
+					}
+				})
+				setting.$navpanel.swipe({
+					swipeStatus:function(event, phase, direction, distance){
+						event.stopPropagation()
+					}
+				})
+			}
 			slideshow.showslide(setting.curimage) //show initial slide
 			setting.oninit.call(slideshow) //trigger oninit() event
+
+			$(window).bind('resize.'+setting.wrapperid, function(){ // on window resize
+				clearTimeout(setting.resizetimer)
+				setting.$descpanel.css('visibility', 'hidden')
+				setting.$navpanel.css('visibility', 'hidden')
+				setting.resizetimer = setTimeout(function(){
+					var wrapperheight = setting.$wrapperdiv.height()
+					var descheight = setting.$descpanel.outerHeight()
+					if (setting.scaleimage == 'both'){
+						setting.$gallerylayers.eq(setting.fglayer).find('img').css('maxHeight', setting.$wrapperdiv.height())
+					}
+					setting.$descpanel.css({'top': -descheight, visibility: 'visible'})
+					setting.$navpanel.css({top: wrapperheight, visibility: 'visible'})
+				}, 100)
+			})
+			$(window).trigger('resize.'+setting.wrapperid)
+
 			$(window).bind('unload', function(){ //clean up and persist
 				$(slideshow.setting.navbuttons).unbind()
 				if (slideshow.setting.persist) //remember last shown image's index
@@ -106,7 +155,6 @@ simpleGallery.prototype={
 
 	navigate:function(keyword){
 		clearTimeout(this.setting.playtimer)
-		this.setting.totalsteps=100000 //if any of the nav buttons are clicked on, set totalsteps limit to an "unreachable" number 
 		if (!isNaN(parseInt(keyword))){
 			this.showslide(parseInt(keyword))
 		}
@@ -116,6 +164,7 @@ simpleGallery.prototype={
 		else{ //if play|pause button
 			var slideshow=this
 			var $playbutton=$(this.setting.navbuttons).eq(1)
+			this.setting.totalsteps=100000 //if play/puase button is clicked on, set totalsteps limit to an "unreachable" number 
 			if (!this.setting.ispaused){ //if pause Gallery
 				this.setting.autoplay[0]=false
 				$playbutton.attr({title:'Play', src:simpleGallery_navpanel.images[1]})
@@ -136,7 +185,10 @@ simpleGallery.prototype={
 		var imgindex=(keyword=="next")? (setting.curimage<totalimages-1? setting.curimage+1 : 0)
 			: (keyword=="prev")? (setting.curimage>0? setting.curimage-1 : totalimages-1)
 			: Math.min(keyword, totalimages-1)
-		setting.gallerylayers[setting.bglayer].innerHTML=simpleGallery.routines.getSlideHTML(setting.imagearray[imgindex])
+		setting.gallerylayers[setting.bglayer].innerHTML=simpleGallery.routines.getSlideHTML(setting.imagearray[imgindex], setting.scaleimage)
+		if (setting.scaleimage == 'both'){
+			setting.$gallerylayers.eq(setting.bglayer).find('img').css('maxHeight', setting.$wrapperdiv.height())
+		}
 		setting.$gallerylayers.eq(setting.bglayer).css({zIndex:1000, opacity:0}) //background layer becomes foreground
 			.stop().css({opacity:0}).animate({opacity:1}, setting.fadeduration, function(){ //Callback function after fade animation is complete:
 				clearTimeout(setting.playtimer)
@@ -160,8 +212,11 @@ simpleGallery.prototype={
 		setting.curimage=imgindex
 		setting.navbuttons[3].innerHTML=(setting.curimage+1) + '/' + setting.imagearray.length
 		if (setting.imagearray[imgindex][3]){ //if this slide contains a description
-			setting.$descpanel.css({visibility:'visible'})
 			setting.descdiv.innerHTML=setting.imagearray[imgindex][3]
+			setting.$descpanel.css({visibility:'visible'})
+			if (parseInt(setting.$descpanel.css('top')) != 0){ // if descpanel is currently hidden
+				setting.$descpanel.css({top: -setting.$descpanel.outerHeight()}) // make sure descpanel is hidden (in case previous descpanel has different height than current)
+			}
 		}
 		else if (setting.longestdesc!=""){ //if at least one slide contains a description (feature is enabled)
 			setting.descdiv.innerHTML=null
@@ -172,7 +227,7 @@ simpleGallery.prototype={
 
 	showhidenavpanel:function(state){
 		var setting=this.setting
-		var endpoint=(state=="show")? setting.dimensions[1]-setting.panelheight : this.setting.dimensions[1]
+		var endpoint=(state=="show")? setting.$wrapperdiv.height()-setting.panelheight : setting.$wrapperdiv.height()
 		setting.$navpanel.stop().animate({top:endpoint}, simpleGallery_navpanel.slideduration)
 		if (setting.longestdesc!="") //if at least one slide contains a description (feature is enabled)
 			this.showhidedescpanel(state)
@@ -180,18 +235,19 @@ simpleGallery.prototype={
 
 	showhidedescpanel:function(state){
 		var setting=this.setting
-		var endpoint=(state=="show")? 0 : -setting.descpanelheight
+		var endpoint=(state=="show")? 0 : -setting.$descpanel.outerHeight()
 		setting.$descpanel.stop().animate({top:endpoint}, simpleGallery_navpanel.slideduration)
 	}
 }
 
 simpleGallery.routines={
 
-	getSlideHTML:function(imgelement){
+	getSlideHTML:function(imgelement, scaleimagesetting){
+		var addclass = (scaleimagesetting == 'none')? '' : ' responsive'
 		var layerHTML=(imgelement[1])? '<a href="'+imgelement[1]+'" target="'+imgelement[2]+'">\n' : '' //hyperlink slide?
 		layerHTML+='<img src="'+imgelement[0]+'" style="border-width:0" />'
 		layerHTML+=(imgelement[1])? '</a>' : ''
-		return layerHTML //return HTML for this layer
+		return '<div class="galleryinner' + addclass +'">' + layerHTML + '</div>' //return HTML for this layer
 	},
 
 	addnavpanel:function(setting){
@@ -215,16 +271,10 @@ simpleGallery.routines={
 	},
 
 	adddescpanel:function(setting){
-		setting.$descpanel=$('<div class="gallerydesc"><div class="gallerydescbg"></div><div class="gallerydescfg"><div class="gallerydesctext"></div></div></div>')
-			.css({position:'absolute', width:'100%', left:0, top:-1000, zIndex:'1001'})
-			.find('div').css({position:'absolute', left:0, top:0, width:'100%'})
-			.eq(0).css({background:'black', opacity:simpleGallery_navpanel.panel.opacity}).end() //"gallerydescbg" div
-			.eq(1).css({color:'white'}).end() //"gallerydescfg" div
-			.eq(2).html(setting.longestdesc).end().end()
+		var curdesc = setting.imagearray[setting.curimage][3]
+		setting.$descpanel=$('<div class="gallerydesc"><div class="gallerydesctext">' + curdesc +'</div></div>')
 			.appendTo(setting.$wrapperdiv)
-		var $gallerydesctext=setting.$descpanel.find('div.gallerydesctext')
-		setting.descpanelheight=$gallerydesctext.outerHeight()
-		setting.$descpanel.css({top:-setting.descpanelheight, height:setting.descpanelheight}).find('div').css({height:'100%'})
+		setting.$descpanel.css({top: -setting.$descpanel.outerHeight()})
 		return setting.$descpanel.find('div.gallerydesctext').get(0) //return gallery description DIV as a DOM object
 	},
 

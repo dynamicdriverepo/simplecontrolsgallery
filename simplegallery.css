@@ -1,0 +1,64 @@
+.simplegallery{ //CSS for Simple Gallery 
+	position: relative; /*keep this intact*/
+	visibility: hidden; /*keep this intact*/
+	border: 1px solid black; /* default border of gallery */
+}
+
+
+.simplegallery .gallerylayer{
+	width: 100%;
+	height: 100%;
+	text-align: center;
+	background: black;
+
+}
+
+.simplegallery .gallerylayer:before{ /* technique to vertical center gallery contents */
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  height: 100%;
+}
+
+.simplegallery .gallerylayer .galleryinner{
+	position: relative;
+	max-width: 100%;
+	vertical-align: middle;
+	display: inline-block;
+}
+
+.simplegallery .gallerylayer .galleryinner.responsive img{
+	max-width: 100%;
+	display: inline-block;
+}
+
+.simplegallery .gallerydesc{
+	position: absolute;
+	width: 100%;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+	left: 0;
+	top: 1000;
+	z-index: 1001;
+}
+
+.simplegallery .gallerydesc:before{ /* overlay beneath description panel */
+	content: '';
+	position: absolute;
+	background: black;
+	width: 100%;
+	height: 100%;
+	left: 0;
+	top: 0;
+	opacity: 0.4;
+	z-index: -1;
+}
+
+
+.simplegallery .gallerydesc .gallerydesctext{
+	width: auto;
+	color: white;
+	text-align: left;
+	padding: 5px; /* padding inside description panel */
+}
